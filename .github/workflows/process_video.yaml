@@ -1,0 +1,44 @@
+name: "Process Video To Frames"
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_path:
+        description: "Path to the video file"
+        required: true
+
+jobs:
+  process_video:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Save video to workspace
+        run: cp ${{ github.event.inputs.video_path }} video.mp4
+
+      - name: Convert video to GIF
+        run: |
+          ffmpeg -i video.mp4 -vf "fps=10,scale=320:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 output.gif
+        shell: bash
+
+      - name: Extract frames from video
+        run: |
+          ffmpeg -i video.mp4 -vsync 0 frame_%04d.png
+        shell: bash
+
+      - name: Archive PNG sequence
+        run: |
+          zip -r png_sequence.zip frame_*.png
+        shell: bash
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: processed_frames
+          path: |
+            png_sequence.zip
+            output.gif
